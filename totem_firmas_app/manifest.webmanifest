@@ -1,0 +1,9 @@
+{
+  "name": "Tótem de Firmas",
+  "short_name": "Firmas",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": []
+}
