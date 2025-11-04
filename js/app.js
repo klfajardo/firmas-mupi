@@ -1,4 +1,5 @@
-// v5: Android-safe export (no bg draw when only-signature), toBlob fallback
+// app.js — Carpeta si hay permiso; si no, descarga directa (Android-friendly)
+
 const canvas = document.getElementById('sigCanvas');
 const bg = document.getElementById('bg');
 const btnGuardar = document.getElementById('btnGuardar');
@@ -8,9 +9,9 @@ const toast = document.getElementById('toast');
 const badge = document.getElementById('badge');
 
 const CONFIG = {
-  strokeColor: '#000000',
+  strokeColor: '#000000',    // usa '#FFFFFF' si tu arte es oscuro
   strokeWidth: 5,
-  exportOnlySignature: true,   // no tocamos el bg al exportar, evita CORS/taint en Android file://
+  exportOnlySignature: true, // PNG transparente solo firma
   filenamePrefix: 'firma_',
   autoClearSeconds: 15,
   exportWidth: 1080,
@@ -24,6 +25,7 @@ let dirty = false;
 let savedSinceLastDraw = false;
 let autoClearTimer = null;
 
+// ===== Canvas / Dibujo (Pointer Events + fallbacks) =====
 function resizeCanvas(){
   const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   const rect = canvas.getBoundingClientRect();
@@ -123,15 +125,14 @@ function ts(){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 }
 
+// ===== Guardado: carpeta si se puede; si no, descarga directa =====
 async function ensureDir(){
-  if (!('showDirectoryPicker' in window)) {
-    throw new Error('Este navegador no permite guardar directo a carpeta. Use Chrome/Edge actual.');
-  }
+  if (!('showDirectoryPicker' in window)) throw new Error('no_dir_api');
   if (!dirHandle){
     dirHandle = await window.showDirectoryPicker({id:'firmas_dir'});
   }
   const perm = await dirHandle.requestPermission({mode:'readwrite'});
-  if (perm !== 'granted') throw new Error('Sin permiso para escribir en la carpeta.');
+  if (perm !== 'granted') throw new Error('no_permission');
 }
 
 // toBlob robusto con fallback a toDataURL
@@ -140,72 +141,71 @@ function canvasToPngBlobSafe(cnv){
     try {
       cnv.toBlob((blob)=>{
         if (blob) return resolve(blob);
-        // Fallback si blob es null
         const dataURL = cnv.toDataURL('image/png');
         const bin = atob(dataURL.split(',')[1]);
         const arr = new Uint8Array(bin.length);
         for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
         resolve(new Blob([arr], {type:'image/png'}));
       });
-    } catch (e) {
-      // Fallback total
+    } catch {
       try {
         const dataURL = cnv.toDataURL('image/png');
         const bin = atob(dataURL.split(',')[1]);
         const arr = new Uint8Array(bin.length);
         for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
         resolve(new Blob([arr], {type:'image/png'}));
-      } catch (e2) {
+      } catch {
         resolve(null);
       }
     }
   });
 }
 
+async function saveAsDownload(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click(); // user gesture: viene del click en "Guardar"
+  setTimeout(()=> {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 1500);
+}
+
 async function exportPNG(){
   if (!dirty) { showToast('Primero firme con el dedo'); return; }
-  await ensureDir();
 
-  // Export SOLO firma para evitar taint por bg en Android/file://
-  if (CONFIG.exportOnlySignature) {
-    const outSig = document.createElement('canvas');
-    outSig.width = CONFIG.exportWidth;
-    outSig.height = CONFIG.exportHeight;
-    const sctx = outSig.getContext('2d');
+  // Armamos salida SOLO con la firma, 1080x1920 (evita CORS/taint por bg en Android)
+  const out = document.createElement('canvas');
+  out.width = CONFIG.exportWidth;
+  out.height = CONFIG.exportHeight;
+  const octx = out.getContext('2d');
+  octx.clearRect(0,0,out.width,out.height);
+  octx.drawImage(canvas, 0, 0, out.width, out.height);
 
-    // Escalamos la firma visible al tamaño 1080x1920
-    sctx.drawImage(canvas, 0, 0, outSig.width, outSig.height);
+  const blob = await canvasToPngBlobSafe(out);
+  if (!blob) { showToast('No se pudo crear el PNG'); return; }
+  const filename = CONFIG.filenamePrefix + ts() + '.png';
 
-    const blob = await canvasToPngBlobSafe(outSig);
-    if (!blob) throw new Error('No se pudo crear el PNG en este dispositivo');
-    const name = CONFIG.filenamePrefix + ts() + '.png';
-    const fileHandle = await dirHandle.getFileHandle(name, {create:true});
+  // 1) Intentar guardar en carpeta (sin pedir cada vez si ya diste permiso)
+  try {
+    await ensureDir(); // puede fallar en Android/Firefox
+    const fileHandle = await dirHandle.getFileHandle(filename, {create:true});
     const writable = await fileHandle.createWritable();
     await writable.write(blob);
     await writable.close();
-  } else {
-    // Modo estampar: incluye fondo blanco + arte (+ firma)
-    const outCanvas = document.createElement('canvas');
-    outCanvas.width = CONFIG.exportWidth;
-    outCanvas.height = CONFIG.exportHeight;
-    const octx = outCanvas.getContext('2d');
-    octx.fillStyle = '#ffffff';
-    octx.fillRect(0, 0, outCanvas.width, outCanvas.height);
-    try { octx.drawImage(bg, 0, 0, outCanvas.width, outCanvas.height); } catch(_) {}
-    octx.drawImage(canvas, 0, 0, outCanvas.width, outCanvas.height);
-
-    const blob = await canvasToPngBlobSafe(outCanvas);
-    if (!blob) throw new Error('No se pudo crear el PNG en este dispositivo');
-    const name = CONFIG.filenamePrefix + ts() + '.png';
-    const fileHandle = await dirHandle.getFileHandle(name, {create:true});
-    const writable = await fileHandle.createWritable();
-    await writable.write(blob);
-    await writable.close();
+    savedSinceLastDraw = true;
+    showToast('Firma guardada ✔');
+    clearCanvas();
+    return;
+  } catch (e) {
+    // 2) Fallback silencioso: descarga directa a "Descargas"
+    await saveAsDownload(blob, filename);
+    savedSinceLastDraw = true;
+    showToast('Descargado ✔');
+    clearCanvas();
   }
-
-  savedSinceLastDraw = true;
-  showToast('Firma guardada ✔');
-  clearCanvas();
 }
 
 btnGuardar.addEventListener('click', ()=>{
@@ -216,11 +216,12 @@ btnLimpiar.addEventListener('click', ()=>{
   showToast('Pantalla limpia');
 });
 
+// ===== UI menor =====
 function showToast(msg){
   toast.textContent = msg;
   toast.style.display = 'block';
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(()=> toast.style.display='none', 1800);
+  showToast._t = setTimeout(()=> toast.style.display='none', 2000);
 }
 (function(){
   const ua = navigator.userAgent;
