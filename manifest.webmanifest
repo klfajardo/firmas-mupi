@@ -1,9 +1,13 @@
 {
   "name": "Tótem de Firmas",
   "short_name": "Firmas",
-  "start_url": ".",
-  "display": "standalone",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
-  "icons": []
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
 }
