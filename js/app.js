@@ -21,6 +21,31 @@ const CONFIG = {
 
 let drawing=false, lastX=0, lastY=0, dirty=false, savedSinceLastDraw=false, autoClearTimer=null;
 
+// === Fullscreen y orientación en el primer gesto del usuario ===
+let _fsTried = false;
+
+async function enterFullscreenIfPossible() {
+  if (_fsTried) return;
+  _fsTried = true;
+  try {
+    // Pide fullscreen sobre el documento
+    if (document.fullscreenElement == null && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch(_) {}
+  // Opcional: bloquear orientación vertical si el SO lo permite
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      await screen.orientation.lock('portrait');
+    }
+  } catch(_) {}
+}
+
+// Engancha fullscreen al primer gesto (toque/clic) sobre el canvas o la UI
+['pointerdown','touchstart','mousedown','click'].forEach(ev => {
+  canvas.addEventListener(ev, enterFullscreenIfPossible, { once:true, passive:true });
+});
+
 // ------------ Canvas ------------
 function resizeCanvas(){
   const dpr = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
