@@ -224,7 +224,7 @@ btnExportar?.addEventListener('click', ()=>{
   exportAllFromOPFS().catch(err => showToast(err.message || String(err)));
 });
 
-// ===== UI menor =====
+// ===== UI menor ===== /
 function showToast(msg){
   toast.textContent = msg;
   toast.style.display = 'block';
