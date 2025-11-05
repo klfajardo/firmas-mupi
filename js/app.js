@@ -1,4 +1,4 @@
-// app.js — Carpeta si hay permiso; si no, descarga directa (Android-friendly)
+// app.js — Descarga directa SIEMPRE (sin permisos, sin showDirectoryPicker)
 
 const canvas = document.getElementById('sigCanvas');
 const bg = document.getElementById('bg');
@@ -9,23 +9,22 @@ const toast = document.getElementById('toast');
 const badge = document.getElementById('badge');
 
 const CONFIG = {
-  strokeColor: '#000000',    // usa '#FFFFFF' si tu arte es oscuro
+  strokeColor: '#000000',    // cambia a '#FFFFFF' si tu arte es oscuro
   strokeWidth: 5,
-  exportOnlySignature: true, // PNG transparente solo firma
+  exportOnlySignature: true, // PNG transparente solo firma (evita CORS con bg)
   filenamePrefix: 'firma_',
   autoClearSeconds: 15,
   exportWidth: 1080,
   exportHeight: 1920
 };
 
-let dirHandle = null;
 let drawing = false;
 let lastX=0, lastY=0;
 let dirty = false;
 let savedSinceLastDraw = false;
 let autoClearTimer = null;
 
-// ===== Canvas / Dibujo (Pointer Events + fallbacks) =====
+// ===== Canvas / Dibujo =====
 function resizeCanvas(){
   const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   const rect = canvas.getBoundingClientRect();
@@ -125,22 +124,13 @@ function ts(){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 }
 
-// ===== Guardado: carpeta si se puede; si no, descarga directa =====
-async function ensureDir(){
-  if (!('showDirectoryPicker' in window)) throw new Error('no_dir_api');
-  if (!dirHandle){
-    dirHandle = await window.showDirectoryPicker({id:'firmas_dir'});
-  }
-  const perm = await dirHandle.requestPermission({mode:'readwrite'});
-  if (perm !== 'granted') throw new Error('no_permission');
-}
-
-// toBlob robusto con fallback a toDataURL
+// ===== toBlob robusto + DESCARGA directa =====
 function canvasToPngBlobSafe(cnv){
   return new Promise((resolve) => {
     try {
       cnv.toBlob((blob)=>{
         if (blob) return resolve(blob);
+        // Fallback si devuelve null
         const dataURL = cnv.toDataURL('image/png');
         const bin = atob(dataURL.split(',')[1]);
         const arr = new Uint8Array(bin.length);
@@ -162,11 +152,13 @@ function canvasToPngBlobSafe(cnv){
 }
 
 async function saveAsDownload(blob, filename){
+  // Descarga directa (sin permisos)
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
+  a.rel = 'noopener'; // por si acaso
   document.body.appendChild(a);
-  a.click(); // user gesture: viene del click en "Guardar"
+  a.click(); // gesto del usuario: viene del click en "Guardar"
   setTimeout(()=> {
     URL.revokeObjectURL(a.href);
     a.remove();
@@ -176,7 +168,7 @@ async function saveAsDownload(blob, filename){
 async function exportPNG(){
   if (!dirty) { showToast('Primero firme con el dedo'); return; }
 
-  // Armamos salida SOLO con la firma, 1080x1920 (evita CORS/taint por bg en Android)
+  // Salida SOLO firma 1080x1920 (evita taint por bg en Android)
   const out = document.createElement('canvas');
   out.width = CONFIG.exportWidth;
   out.height = CONFIG.exportHeight;
@@ -186,26 +178,13 @@ async function exportPNG(){
 
   const blob = await canvasToPngBlobSafe(out);
   if (!blob) { showToast('No se pudo crear el PNG'); return; }
-  const filename = CONFIG.filenamePrefix + ts() + '.png';
 
-  // 1) Intentar guardar en carpeta (sin pedir cada vez si ya diste permiso)
-  try {
-    await ensureDir(); // puede fallar en Android/Firefox
-    const fileHandle = await dirHandle.getFileHandle(filename, {create:true});
-    const writable = await fileHandle.createWritable();
-    await writable.write(blob);
-    await writable.close();
-    savedSinceLastDraw = true;
-    showToast('Firma guardada ✔');
-    clearCanvas();
-    return;
-  } catch (e) {
-    // 2) Fallback silencioso: descarga directa a "Descargas"
-    await saveAsDownload(blob, filename);
-    savedSinceLastDraw = true;
-    showToast('Descargado ✔');
-    clearCanvas();
-  }
+  const filename = CONFIG.filenamePrefix + ts() + '.png';
+  await saveAsDownload(blob, filename);
+
+  savedSinceLastDraw = true;
+  showToast('Descargado ✔');
+  clearCanvas();
 }
 
 btnGuardar.addEventListener('click', ()=>{
