@@ -1,4 +1,4 @@
-// app.js — Descarga directa SIEMPRE (sin permisos, sin showDirectoryPicker)
+// app.js — Guarda SILENCIOSO en OPFS + botón de exportar todas
 
 const canvas = document.getElementById('sigCanvas');
 const bg = document.getElementById('bg');
@@ -7,11 +7,12 @@ const btnLimpiar = document.getElementById('btnLimpiar');
 const centerCta = document.getElementById('centerCta');
 const toast = document.getElementById('toast');
 const badge = document.getElementById('badge');
+const btnExportar = document.getElementById('btnExportar'); // <- nuevo
 
 const CONFIG = {
-  strokeColor: '#000000',    // cambia a '#FFFFFF' si tu arte es oscuro
+  strokeColor: '#000000',     // cambia a '#FFFFFF' si tu arte es oscuro
   strokeWidth: 5,
-  exportOnlySignature: true, // PNG transparente solo firma (evita CORS con bg)
+  exportOnlySignature: true,  // PNG transparente solo firma
   filenamePrefix: 'firma_',
   autoClearSeconds: 15,
   exportWidth: 1080,
@@ -23,6 +24,16 @@ let lastX=0, lastY=0;
 let dirty = false;
 let savedSinceLastDraw = false;
 let autoClearTimer = null;
+
+// === Pedir persistencia para reducir riesgo de eviction ===
+(async () => {
+  try {
+    if (navigator.storage?.persist) {
+      const already = await navigator.storage.persisted();
+      if (!already) await navigator.storage.persist().catch(()=>{});
+    }
+  } catch {}
+})();
 
 // ===== Canvas / Dibujo =====
 function resizeCanvas(){
@@ -121,22 +132,21 @@ function cancelAutoClear(){
 function ts(){
   const d = new Date();
   const pad = n=> String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}_${pad(d.getSeconds())}`;
 }
 
-// ===== toBlob robusto + DESCARGA directa =====
+// ===== Helper: toBlob robusto =====
 function canvasToPngBlobSafe(cnv){
   return new Promise((resolve) => {
     try {
       cnv.toBlob((blob)=>{
         if (blob) return resolve(blob);
-        // Fallback si devuelve null
         const dataURL = cnv.toDataURL('image/png');
         const bin = atob(dataURL.split(',')[1]);
         const arr = new Uint8Array(bin.length);
         for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
         resolve(new Blob([arr], {type:'image/png'}));
-      });
+      }, 'image/png');
     } catch {
       try {
         const dataURL = cnv.toDataURL('image/png');
@@ -151,24 +161,39 @@ function canvasToPngBlobSafe(cnv){
   });
 }
 
-async function saveAsDownload(blob, filename){
-  // Descarga directa (sin permisos)
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.rel = 'noopener'; // por si acaso
-  document.body.appendChild(a);
-  a.click(); // gesto del usuario: viene del click en "Guardar"
-  setTimeout(()=> {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 1500);
+// ===== Guardar 1 firma en OPFS (silencioso) =====
+async function saveOneToOPFS(blob, filename){
+  const root = await navigator.storage.getDirectory();              // OPFS root
+  const dir = await root.getDirectoryHandle('firmas', {create:true});
+  const fileHandle = await dir.getFileHandle(filename, {create:true});
+  const w = await fileHandle.createWritable();
+  await w.write(blob);
+  await w.close(); // atómico al cerrar
 }
 
+// ===== Exportar TODO desde OPFS (descargas múltiples) =====
+async function exportAllFromOPFS(){
+  const root = await navigator.storage.getDirectory();
+  const dir = await root.getDirectoryHandle('firmas', {create:true});
+  for await (const entry of dir.values()){
+    if (entry.kind === 'file'){
+      const file = await entry.getFile();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file);
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    }
+  }
+  showToast('Exportación lanzada');
+}
+
+// ===== Exportar UNA firma (flujo principal) =====
 async function exportPNG(){
   if (!dirty) { showToast('Primero firme con el dedo'); return; }
 
-  // Salida SOLO firma 1080x1920 (evita taint por bg en Android)
+  // Render SOLO firma 1080x1920 (evita taint por bg)
   const out = document.createElement('canvas');
   out.width = CONFIG.exportWidth;
   out.height = CONFIG.exportHeight;
@@ -180,19 +205,23 @@ async function exportPNG(){
   if (!blob) { showToast('No se pudo crear el PNG'); return; }
 
   const filename = CONFIG.filenamePrefix + ts() + '.png';
-  await saveAsDownload(blob, filename);
+  await saveOneToOPFS(blob, filename); // <<< guarda sin prompt
 
   savedSinceLastDraw = true;
-  showToast('Descargado ✔');
+  showToast('Guardado ✔ (interno)');
   clearCanvas();
 }
 
+// ===== Botones =====
 btnGuardar.addEventListener('click', ()=>{
   exportPNG().catch(err => showToast(err.message || String(err)));
 });
 btnLimpiar.addEventListener('click', ()=>{
   clearCanvas();
   showToast('Pantalla limpia');
+});
+btnExportar?.addEventListener('click', ()=>{
+  exportAllFromOPFS().catch(err => showToast(err.message || String(err)));
 });
 
 // ===== UI menor =====
