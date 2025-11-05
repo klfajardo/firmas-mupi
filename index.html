@@ -11,8 +11,7 @@
       height: 100%; margin: 0;
       background: #ffffff;
       color: #111; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-      user-select: none; -webkit-user-select:none; touch-action: none;
-      overflow: hidden;
+      user-select: none; -webkit-user-select:none; touch-action: none; overflow: hidden;
     }
     .app { position: relative; height: 100vh; width: 100vw; overflow: hidden; display:flex; }
     #bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; background:#fff; }
@@ -26,12 +25,24 @@
     .toast { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 4; padding: .7rem 1rem; border-radius: 10px; background: rgba(0,0,0,.75); border:1px solid rgba(255,255,255,.25); font-size: clamp(14px, 2.2vh, 18px); color:#fff; display:none; }
     .badge { position:absolute; right:.75rem; top:.75rem; z-index:4; font-size:12px; opacity:.6; color:#111; background: rgba(255,255,255,.7); padding:.2rem .4rem; border-radius:6px; }
     .hidden { display:none !important; }
+
+    /* Botón discreto arriba-izquierda */
+    .export-btn {
+      position:absolute; top:.6rem; left:.6rem; z-index:4;
+      font-size:14px; padding:.35rem .6rem; border-radius:10px;
+      border:1px solid rgba(0,0,0,.2); background: rgba(255,255,255,.8); color:#111;
+      opacity:.7;
+    }
+    .export-btn:active { transform: scale(.98); }
   </style>
 </head>
 <body>
   <div class="app" id="app">
     <img id="bg" src="assets/arte_vertical.png" alt="">
     <canvas id="sigCanvas"></canvas>
+
+    <!-- Botón discreto de exportación -->
+    <button class="export-btn" id="btnExportar" title="Exportar todas las firmas">Exportar todo</button>
 
     <div class="center-cta" id="centerCta">
       <div class="bubble">FIRME AQUÍ</div>
