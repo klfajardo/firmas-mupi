@@ -7,56 +7,158 @@
   <link rel="manifest" href="manifest.webmanifest">
   <title>Tótem de Firmas</title>
   <style>
-    :root{
-      /* Sube la barra de botones sin romper en pantallas chicas o grandes */
-      --ui-lift: clamp(48px, 10vh, 140px);
-    }
     html, body {
-      height: 100%; margin: 0;
+      height: 100%;
+      margin: 0;
       background: #ffffff;
-      color: #111; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-      user-select: none; -webkit-user-select:none; touch-action: none; overflow: hidden;
-      /* Evita que algo quede debajo del notch */
-      padding-top: env(safe-area-inset-top);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
+      color: #111;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      overflow: hidden;
     }
-    .app { position: relative; height: 100vh; width: 100vw; overflow: hidden; display:flex; }
-    #bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; background:#fff; }
-    #sigCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; touch-action: none; background: transparent; }
-    .center-cta { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; display:flex; flex-direction:column; align-items:center; gap:.6rem; text-align:center; pointer-events:none; }
-    .center-cta .bubble { pointer-events:none; font-weight:700; letter-spacing:.5px; font-size: clamp(18px, 3.6vh, 34px); padding: .6em 1.2em; border-radius: 999px; border: 2px dashed rgba(0,0,0,.35); background: rgba(255,255,255,.65); color:#111; }
 
-    /* UI de botones elevada, SIN fondo ni degradado */
+    .app {
+      position: relative;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+    }
+
+    #bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      background: #fff;
+      pointer-events: none;
+    }
+
+    #sigCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      touch-action: none;
+      background: transparent;
+    }
+
+    .center-cta {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .6rem;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .center-cta .bubble {
+      pointer-events: none;
+      font-weight: 700;
+      letter-spacing: .5px;
+      font-size: clamp(18px, 3.6vh, 34px);
+      padding: .6em 1.2em;
+      border-radius: 999px;
+      border: 2px dashed rgba(0,0,0,.35);
+      background: rgba(255,255,255,.65);
+      color: #111;
+    }
+
     .ui {
-      position:absolute; left:0; right:0;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ui-lift));
-      z-index:3; display:flex; gap:1rem; justify-content:center; align-items:center;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      align-items: center;
       padding: clamp(8px, 2vh, 16px);
-      background: none;               /* <-- quitado el fade */
-      border-radius: 0;               /* sin borde redondeado */
-      margin: 0 auto;
-      width: min(92vw, 1000px);
-      box-shadow: none;               /* por si acaso */
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,.85) 60%,
+        rgba(255,255,255,.95) 100%
+      );
     }
-    .btn { font-size: clamp(16px, 3.2vh, 28px); padding: .6em 1.1em; border-radius: 999px; border: 2px solid rgba(0,0,0,.25); background: #ffffff; color:#111; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+    .btn {
+      font-size: clamp(16px, 3.2vh, 28px);
+      padding: .6em 1.1em;
+      border-radius: 999px;
+      border: 2px solid rgba(0,0,0,.25);
+      background: #ffffff;
+      color: #111;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     .btn:active { transform: scale(.98); }
-    .btn.primary { border-color: #0077ff; background: #ffffff; box-shadow: none; font-weight: 700; }
 
-    .toast { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 4; padding: .7rem 1rem; border-radius: 10px; background: rgba(0,0,0,.75); border:1px solid rgba(255,255,255,.25); font-size: clamp(14px, 2.2vh, 18px); color:#fff; display:none; }
-    .badge { position:absolute; right:.75rem; top: max(.75rem, env(safe-area-inset-top)); z-index:4; font-size:12px; opacity:.6; color:#111; background: rgba(255,255,255,.7); padding:.2rem .4rem; border-radius:6px; }
-    .hidden { display:none !important; }
-
-    /* Botón discreto arriba-izquierda, respetando notch */
-    .export-btn {
-      position:absolute; 
-      top: max(.6rem, env(safe-area-inset-top));
-      left:.6rem; 
-      z-index:4;
-      font-size:14px; padding:.35rem .6rem; border-radius:10px;
-      border:1px solid rgba(0,0,0,.2); background: rgba(255,255,255,.8); color:#111;
-      opacity:.7;
+    .btn.primary {
+      border-color: #0077ff;
+      background: #ffffff;
+      box-shadow: 0 0 0 2px rgba(0,119,255,.10), inset 0 0 24px rgba(0,119,255,.06);
+      font-weight: 700;
     }
+
+    .toast {
+      position: absolute;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      padding: .7rem 1rem;
+      border-radius: 10px;
+      background: rgba(0,0,0,.75);
+      border: 1px solid rgba(255,255,255,.25);
+      font-size: clamp(14px, 2.2vh, 18px);
+      color: #fff;
+      display: none;
+    }
+
+    .badge {
+      position: absolute;
+      right: .75rem;
+      top: .75rem;
+      z-index: 4;
+      font-size: 12px;
+      opacity: .6;
+      color: #111;
+      background: rgba(255,255,255,.7);
+      padding: .2rem .4rem;
+      border-radius: 6px;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Botón Exportar todo, discreto arriba-izquierda */
+    .export-btn {
+      position: absolute;
+      top: .6rem;
+      left: .6rem;
+      z-index: 4;
+      font-size: 14px;
+      padding: .35rem .6rem;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,.2);
+      background: rgba(255,255,255,.85);
+      color: #111;
+      opacity: .75;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     .export-btn:active { transform: scale(.98); }
   </style>
 </head>
@@ -65,8 +167,10 @@
     <img id="bg" src="assets/arte_vertical.png" alt="">
     <canvas id="sigCanvas"></canvas>
 
-    <!-- Botón discreto de exportación -->
-    <button class="export-btn" id="btnExportar" title="Exportar todas las firmas">Exportar todo</button>
+    <!-- Botón discreto de exportación (manual) -->
+    <button class="export-btn" id="btnExportar" title="Exportar todas las firmas">
+      Exportar todo
+    </button>
 
     <div class="center-cta" id="centerCta">
       <div class="bubble">FIRME AQUÍ</div>
@@ -84,7 +188,12 @@
     <div class="badge" id="badge"></div>
   </div>
 
-  <script src="js/app.js"></script>
+  <!-- Librería para generar ZIP en el workaround ?backup -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+          integrity="sha512-x3F7QXl3k9YBdCnSWcZ7jC4f7Gt0CJo5ZLqUE2kIJJZz8NjkH7Kxy4N2eW3yKLFv8UA3X7PyqBYeZ4YAl4kL5Q=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script src="js/app.js?v=backup1"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
