@@ -8,17 +8,17 @@
   <title>Tótem de Firmas</title>
   <style>
     :root{
-      --ui-lift: clamp(48px, 10vh, 140px); /* eleva los botones */
-      --bg-vpad: 6vh;  /* padding vertical para que el arte no choque arriba/abajo */
-      --bg-hpad: 2vw;  /* padding lateral */
-      --bg-url: url("assets/arte_vertical.png"); /* una sola fuente para el fondo */
+      --ui-lift: clamp(48px, 10vh, 140px);      /* eleva los botones */
+      --bg-url: url("assets/arte_vertical.png");/* TU ARTE */
+      --fit-top: 6%;                             /* mueve el arte hacia arriba (0%..20%) */
+      --blur: 18px;                              /* intensidad del fondo difuminado */
     }
 
     html, body {
-      height: 100%; margin: 0;
-      background: #ffffff;
-      color: #111; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-      user-select: none; -webkit-user-select:none; touch-action: none; overflow: hidden;
+      height: 100%; margin: 0; overflow: hidden;
+      background: #fff; color: #111;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+      user-select: none; -webkit-user-select: none; touch-action: none;
       padding-top: env(safe-area-inset-top);
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
@@ -26,41 +26,32 @@
 
     .app {
       position: relative; height: 100vh; width: 100vw; overflow: hidden; display:flex;
-      /* ===== Fondo “mirror/extend” con blur detrás del arte ===== */
     }
+    /* Fondo extendido (no se nota el mirror, pero rellena bien) */
     .app::before{
-      content:""; position:absolute; inset:0; z-index: -1; pointer-events:none;
+      content:""; position:absolute; inset:0; z-index:-2; pointer-events:none;
       background-image: var(--bg-url);
       background-position: center center;
-      background-size: cover;             /* llena todo el viewport */
-      filter: blur(18px) brightness(1.02);/* suaviza y aclara un pelo */
-      transform: scaleX(-1);              /* “mirror” lateral */
-      transform-origin:center;
-    }
-    /* capa blanca suave para que el blur no compita */
-    .app::after{
-      content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
-      background: rgba(255,255,255,0.35);
+      background-size: cover;
+      filter: blur(var(--blur)) brightness(1.03) saturate(1.02);
+      transform: scale(1.05); /* evita ver bordes del blur */
     }
 
-    /* Arte principal SIN deformación, dentro de una caja con padding seguro */
+    /* Arte principal SIN deformación, ocupando lo máximo posible */
     #bg {
-      position: absolute;
-      inset: var(--bg-vpad) var(--bg-hpad);
-      width: calc(100% - 2*var(--bg-hpad));
-      height: calc(100% - 2*var(--bg-vpad));
-      object-fit: contain;          /* clave: NO distorsiona */
-      object-position: center top;  /* prioriza ver el logo superior */
-      background: transparent;
-      z-index: 0;
-      pointer-events: none;
+      position:absolute; inset:0; z-index:-1; pointer-events:none;
+      background-image: var(--bg-url);
+      background-repeat: no-repeat;
+      background-size: contain;               /* <- clave: NO se deforma */
+      background-position: 50% var(--fit-top);/* sube/baja el arte sin recortar */
+      /* fondo blanco detrás de las transparencias del PNG */
+      background-color:#fff;
     }
 
     #sigCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; touch-action: none; background: transparent; }
     .center-cta { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; display:flex; flex-direction:column; align-items:center; gap:.6rem; text-align:center; pointer-events:none; }
-    .center-cta .bubble { pointer-events:none; font-weight:700; letter-spacing:.5px; font-size: clamp(18px, 3.6vh, 34px); padding: .6em 1.2em; border-radius: 999px; border: 2px dashed rgba(0,0,0,.35); background: rgba(255,255,255,.65); color:#111; }
+    .center-cta .bubble { font-weight:700; letter-spacing:.5px; font-size: clamp(18px, 3.6vh, 34px); padding: .6em 1.2em; border-radius: 999px; border: 2px dashed rgba(0,0,0,.35); background: rgba(255,255,255,.65); color:#111; }
 
-    /* UI de botones elevada, SIN barra ni degradado */
     .ui {
       position:absolute; left:0; right:0;
       bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ui-lift));
@@ -70,31 +61,29 @@
     }
     .btn { font-size: clamp(16px, 3.2vh, 28px); padding: .6em 1.1em; border-radius: 999px; border: 2px solid rgba(0,0,0,.25); background: #ffffff; color:#111; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .btn:active { transform: scale(.98); }
-    .btn.primary { border-color: #0077ff; background: #ffffff; box-shadow: none; font-weight: 700; }
+    .btn.primary { border-color: #0077ff; background: #ffffff; font-weight: 700; }
 
     .toast { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 4; padding: .7rem 1rem; border-radius: 10px; background: rgba(0,0,0,.75); border:1px solid rgba(255,255,255,.25); font-size: clamp(14px, 2.2vh, 18px); color:#fff; display:none; }
     .badge { position:absolute; right:.75rem; top: max(.75rem, env(safe-area-inset-top)); z-index:4; font-size:12px; opacity:.6; color:#111; background: rgba(255,255,255,.7); padding:.2rem .4rem; border-radius:6px; }
     .hidden { display:none !important; }
 
-    /* Botón discreto arriba-izquierda, respetando notch */
     .export-btn {
-      position:absolute; 
-      top: max(.6rem, env(safe-area-inset-top));
-      left:.6rem; 
-      z-index:4;
+      position:absolute; top: max(.6rem, env(safe-area-inset-top)); left:.6rem; z-index:4;
       font-size:14px; padding:.35rem .6rem; border-radius:10px;
-      border:1px solid rgba(0,0,0,.2); background: rgba(255,255,255,.8); color:#111;
-      opacity:.7;
+      border:1px solid rgba(0,0,0,.2); background: rgba(255,255,255,.8); color:#111; opacity:.7;
     }
     .export-btn:active { transform: scale(.98); }
   </style>
 </head>
 <body>
   <div class="app" id="app">
-    <img id="bg" src="assets/arte_vertical.png" alt="">
+    <!-- Fondo/arte -->
+    <div id="bg"></div>
+
+    <!-- Canvas para firmar -->
     <canvas id="sigCanvas"></canvas>
 
-    <!-- Botón discreto de exportación -->
+    <!-- Botón discreto exportación -->
     <button class="export-btn" id="btnExportar" title="Exportar todas las firmas">Exportar todo</button>
 
     <div class="center-cta" id="centerCta">
