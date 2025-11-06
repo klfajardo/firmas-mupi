@@ -8,36 +8,65 @@
   <title>Tótem de Firmas</title>
   <style>
     :root{
-      /* Sube la barra de botones sin romper en pantallas chicas o grandes */
-      --ui-lift: clamp(48px, 10vh, 140px);
+      --ui-lift: clamp(48px, 10vh, 140px); /* eleva los botones */
+      --bg-vpad: 6vh;  /* padding vertical para que el arte no choque arriba/abajo */
+      --bg-hpad: 2vw;  /* padding lateral */
+      --bg-url: url("assets/arte_vertical.png"); /* una sola fuente para el fondo */
     }
+
     html, body {
       height: 100%; margin: 0;
       background: #ffffff;
       color: #111; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
       user-select: none; -webkit-user-select:none; touch-action: none; overflow: hidden;
-      /* Evita que algo quede debajo del notch */
       padding-top: env(safe-area-inset-top);
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
     }
-    .app { position: relative; height: 100vh; width: 100vw; overflow: hidden; display:flex; }
-    #bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; background:#fff; }
+
+    .app {
+      position: relative; height: 100vh; width: 100vw; overflow: hidden; display:flex;
+      /* ===== Fondo “mirror/extend” con blur detrás del arte ===== */
+    }
+    .app::before{
+      content:""; position:absolute; inset:0; z-index: -1; pointer-events:none;
+      background-image: var(--bg-url);
+      background-position: center center;
+      background-size: cover;             /* llena todo el viewport */
+      filter: blur(18px) brightness(1.02);/* suaviza y aclara un pelo */
+      transform: scaleX(-1);              /* “mirror” lateral */
+      transform-origin:center;
+    }
+    /* capa blanca suave para que el blur no compita */
+    .app::after{
+      content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+      background: rgba(255,255,255,0.35);
+    }
+
+    /* Arte principal SIN deformación, dentro de una caja con padding seguro */
+    #bg {
+      position: absolute;
+      inset: var(--bg-vpad) var(--bg-hpad);
+      width: calc(100% - 2*var(--bg-hpad));
+      height: calc(100% - 2*var(--bg-vpad));
+      object-fit: contain;          /* clave: NO distorsiona */
+      object-position: center top;  /* prioriza ver el logo superior */
+      background: transparent;
+      z-index: 0;
+      pointer-events: none;
+    }
+
     #sigCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; touch-action: none; background: transparent; }
     .center-cta { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; display:flex; flex-direction:column; align-items:center; gap:.6rem; text-align:center; pointer-events:none; }
     .center-cta .bubble { pointer-events:none; font-weight:700; letter-spacing:.5px; font-size: clamp(18px, 3.6vh, 34px); padding: .6em 1.2em; border-radius: 999px; border: 2px dashed rgba(0,0,0,.35); background: rgba(255,255,255,.65); color:#111; }
 
-    /* UI de botones elevada, SIN fondo ni degradado */
+    /* UI de botones elevada, SIN barra ni degradado */
     .ui {
       position:absolute; left:0; right:0;
       bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ui-lift));
       z-index:3; display:flex; gap:1rem; justify-content:center; align-items:center;
       padding: clamp(8px, 2vh, 16px);
-      background: none;               /* <-- quitado el fade */
-      border-radius: 0;               /* sin borde redondeado */
-      margin: 0 auto;
-      width: min(92vw, 1000px);
-      box-shadow: none;               /* por si acaso */
+      background: none; margin: 0 auto; width: min(92vw, 1000px);
     }
     .btn { font-size: clamp(16px, 3.2vh, 28px); padding: .6em 1.1em; border-radius: 999px; border: 2px solid rgba(0,0,0,.25); background: #ffffff; color:#111; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .btn:active { transform: scale(.98); }
